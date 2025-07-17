@@ -85,7 +85,7 @@ export default function TripList() {
                       <Button
                         onClick={(e) => {
                           e.stopPropagation()
-                          window.location.href = '/planner'
+                          window.location.href = `/planner?edit=${trip.id}`
                         }}
                         variant="ghost"
                         size="sm"
@@ -145,13 +145,26 @@ export default function TripList() {
 
                   <div>
                     <h5 className="font-medium mb-2">Itinerary Overview:</h5>
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       {selectedTrip.itinerary.map((day, index) => (
                         <div key={day.date} className="text-sm">
-                          <span className="font-medium">Day {index + 1}:</span>
-                          <span className="text-gray-600 ml-2">
-                            {day.activities.length} activities
-                          </span>
+                          <div className="font-medium mb-1">Day {index + 1}:</div>
+                          {day.activities.length > 0 ? (
+                            <div className="space-y-1 ml-2">
+                              {day.activities.slice(0, 3).map(activity => (
+                                <div key={activity.id} className="text-gray-600">
+                                  {activity.time && `${activity.time} - `}{activity.name}
+                                </div>
+                              ))}
+                              {day.activities.length > 3 && (
+                                <div className="text-gray-500 text-xs">
+                                  +{day.activities.length - 3} more activities
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-gray-500 ml-2">No activities planned</div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -159,7 +172,7 @@ export default function TripList() {
 
                   <div className="pt-4 border-t">
                     <Button
-                      onClick={() => window.location.href = '/planner'}
+                      onClick={() => window.location.href = `/planner?edit=${selectedTrip.id}`}
                       className="w-full"
                     >
                       <Edit3 className="h-4 w-4 mr-2" />

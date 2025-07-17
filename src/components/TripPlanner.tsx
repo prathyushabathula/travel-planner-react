@@ -1,19 +1,38 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PlusCircle, Trash2, X } from 'lucide-react'
 import { travelDestinations } from '../App'
-import { saveTrip, Trip, TripActivity, ItineraryDay } from '../utils/localStorage'
+import { saveTrip, getTrips, Trip, TripActivity, ItineraryDay } from '../utils/localStorage'
 import { format, addDays, parseISO } from 'date-fns'
 
 export default function TripPlanner() {
+  const [searchParams] = useSearchParams()
   const [tripName, setTripName] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [selectedDestinations, setSelectedDestinations] = useState<number[]>([])
   const [currentTrip, setCurrentTrip] = useState<Trip | null>(null)
-  const [newActivity, setNewActivity] = useState({ name: '', description: '', time: '' })
+  const [activityInputs, setActivityInputs] = useState<Record<string, { name: string; description: string; time: string }>>({})
+  const [isEditMode, setIsEditMode] = useState(false)
+
+  useEffect(() => {
+    const editTripId = searchParams.get('edit')
+    if (editTripId) {
+      const trips = getTrips()
+      const tripToEdit = trips.find(trip => trip.id === editTripId)
+      if (tripToEdit) {
+        setTripName(tripToEdit.name)
+        setStartDate(tripToEdit.startDate)
+        setEndDate(tripToEdit.endDate)
+        setSelectedDestinations(tripToEdit.destinations.map(d => d.id))
+        setCurrentTrip(tripToEdit)
+        setIsEditMode(true)
+      }
+    }
+  }, [searchParams])
 
   const generateTripDays = (start: string, end: string): ItineraryDay[] => {
     const days: ItineraryDay[] = []
@@ -46,28 +65,29 @@ export default function TripPlanner() {
     }
 
     const trip: Trip = {
-      id: Date.now().toString(),
+      id: isEditMode && currentTrip ? currentTrip.id : Date.now().toString(),
       name: tripName,
       startDate: startDate || '',
       endDate: endDate || '',
       destinations: travelDestinations.filter(d => selectedDestinations.includes(d.id)),
-      itinerary: startDate && endDate ? generateTripDays(startDate, endDate) : [],
-      createdAt: new Date().toISOString()
+      itinerary: startDate && endDate ? generateTripDays(startDate, endDate) : (currentTrip?.itinerary || []),
+      createdAt: isEditMode && currentTrip ? currentTrip.createdAt : new Date().toISOString()
     }
 
     setCurrentTrip(trip)
     saveTrip(trip)
-    alert(`Trip "${tripName}" created successfully!`)
+    alert(`Trip "${tripName}" ${isEditMode ? 'updated' : 'created'} successfully!`)
   }
 
   const addActivity = (dayDate: string) => {
-    if (!currentTrip || !newActivity.name) return
+    const dayInput = activityInputs[dayDate]
+    if (!currentTrip || !dayInput?.name) return
 
     const activity: TripActivity = {
       id: Date.now().toString(),
-      name: newActivity.name,
-      description: newActivity.description,
-      time: newActivity.time
+      name: dayInput.name,
+      description: dayInput.description,
+      time: dayInput.time
     }
 
     const updatedTrip = {
@@ -81,7 +101,10 @@ export default function TripPlanner() {
 
     setCurrentTrip(updatedTrip)
     saveTrip(updatedTrip)
-    setNewActivity({ name: '', description: '', time: '' })
+    setActivityInputs(prev => ({
+      ...prev,
+      [dayDate]: { name: '', description: '', time: '' }
+    }))
   }
 
   const removeActivity = (dayDate: string, activityId: string) => {
@@ -106,6 +129,23 @@ export default function TripPlanner() {
     setEndDate('')
     setSelectedDestinations([])
     setCurrentTrip(null)
+    setActivityInputs({})
+    setIsEditMode(false)
+    window.history.replaceState({}, '', '/planner')
+  }
+
+  const updateActivityInput = (dayDate: string, field: string, value: string) => {
+    setActivityInputs(prev => ({
+      ...prev,
+      [dayDate]: {
+        ...prev[dayDate],
+        [field]: value
+      }
+    }))
+  }
+
+  const getActivityInput = (dayDate: string, field: keyof { name: string; description: string; time: string }) => {
+    return activityInputs[dayDate]?.[field] || ''
   }
 
   return (
@@ -115,11 +155,11 @@ export default function TripPlanner() {
         <p className="text-lg text-gray-600">Create your perfect travel itinerary</p>
       </header>
 
-      {!currentTrip ? (
+      {!currentTrip || isEditMode ? (
         <Card className="max-w-2xl mx-auto">
           <CardHeader>
-            <CardTitle>Create New Trip</CardTitle>
-            <CardDescription>Plan your next adventure</CardDescription>
+            <CardTitle>{isEditMode ? 'Edit Trip' : 'Create New Trip'}</CardTitle>
+            <CardDescription>{isEditMode ? 'Update your travel plans' : 'Plan your next adventure'}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Input
@@ -171,7 +211,7 @@ export default function TripPlanner() {
 
             <Button onClick={createTrip} className="w-full">
               <PlusCircle className="h-4 w-4 mr-2" />
-              Create Trip
+              {isEditMode ? 'Update Trip' : 'Create Trip'}
             </Button>
           </CardContent>
         </Card>
@@ -182,7 +222,18 @@ export default function TripPlanner() {
               <h2 className="text-2xl font-bold text-gray-800">{currentTrip.name}</h2>
               {currentTrip.startDate && currentTrip.endDate && (
                 <p className="text-gray-600">
-                  {format(parseISO(currentTrip.startDate), 'MMM dd, yyyy')} - {format(parseISO(currentTrip.endDate), 'MMM dd, yyyy')}
+                  {(() => {
+                    try {
+                      const start = parseISO(currentTrip.startDate)
+                      const end = parseISO(currentTrip.endDate)
+                      if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+                        return `${format(start, 'MMM dd, yyyy')} - ${format(end, 'MMM dd, yyyy')}`
+                      }
+                    } catch (e) {
+                      return null
+                    }
+                    return null
+                  })()}
                 </p>
               )}
             </div>
@@ -197,7 +248,15 @@ export default function TripPlanner() {
               <Card key={day.date}>
                 <CardHeader>
                   <CardTitle className="text-lg">
-                    Day {index + 1} - {day.date ? format(parseISO(day.date), 'EEEE, MMM dd') : 'No date'}
+                    Day {index + 1} - {(() => {
+                      if (!day.date) return 'No date'
+                      try {
+                        const date = parseISO(day.date)
+                        return !isNaN(date.getTime()) ? format(date, 'EEEE, MMM dd') : 'No date'
+                      } catch (e) {
+                        return 'No date'
+                      }
+                    })()}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -222,18 +281,18 @@ export default function TripPlanner() {
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
                       <Input
                         placeholder="Activity name"
-                        value={newActivity.name}
-                        onChange={(e) => setNewActivity({ ...newActivity, name: e.target.value })}
+                        value={getActivityInput(day.date, 'name')}
+                        onChange={(e) => updateActivityInput(day.date, 'name', e.target.value)}
                       />
                       <Input
                         placeholder="Description"
-                        value={newActivity.description}
-                        onChange={(e) => setNewActivity({ ...newActivity, description: e.target.value })}
+                        value={getActivityInput(day.date, 'description')}
+                        onChange={(e) => updateActivityInput(day.date, 'description', e.target.value)}
                       />
                       <Input
                         type="time"
-                        value={newActivity.time}
-                        onChange={(e) => setNewActivity({ ...newActivity, time: e.target.value })}
+                        value={getActivityInput(day.date, 'time')}
+                        onChange={(e) => updateActivityInput(day.date, 'time', e.target.value)}
                       />
                       <Button onClick={() => addActivity(day.date)} size="sm">
                         <PlusCircle className="h-4 w-4 mr-1" />

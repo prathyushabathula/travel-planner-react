@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { MapPin, Calendar, Map, PlusCircle, List } from 'lucide-react'
+import { MapPin, Calendar, PlusCircle, List } from 'lucide-react'
 
 export default function Navigation() {
   const location = useLocation()
@@ -13,8 +13,6 @@ export default function Navigation() {
         return 'planner'
       case '/calendar':
         return 'calendar'
-      case '/map':
-        return 'map'
       case '/trips':
         return 'trips'
       default:
@@ -25,7 +23,7 @@ export default function Navigation() {
   return (
     <div className="flex justify-center">
       <Tabs value={getActiveTab()} className="w-full max-w-2xl">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="destinations" asChild>
             <Link to="/" className="flex items-center gap-2">
               <MapPin className="h-4 w-4" />
@@ -42,12 +40,6 @@ export default function Navigation() {
             <Link to="/calendar" className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
               <span className="hidden sm:inline">Calendar</span>
-            </Link>
-          </TabsTrigger>
-          <TabsTrigger value="map" asChild>
-            <Link to="/map" className="flex items-center gap-2">
-              <Map className="h-4 w-4" />
-              <span className="hidden sm:inline">Map</span>
             </Link>
           </TabsTrigger>
           <TabsTrigger value="trips" asChild>
