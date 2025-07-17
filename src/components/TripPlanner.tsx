@@ -58,6 +58,34 @@ export default function TripPlanner() {
     return days
   }
 
+  const mergeItineraryWithDates = (existingItinerary: ItineraryDay[], startDate: string, endDate: string): ItineraryDay[] => {
+    if (!startDate || !endDate) return existingItinerary
+    
+    const startDateObj = parseISO(startDate)
+    const endDateObj = parseISO(endDate)
+    
+    if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime())) {
+      return existingItinerary
+    }
+    
+    const newDays: ItineraryDay[] = []
+    let currentDate = startDateObj
+    
+    while (currentDate <= endDateObj) {
+      const dateStr = format(currentDate, 'yyyy-MM-dd')
+      const existingDay = existingItinerary.find(day => day.date === dateStr)
+      
+      newDays.push({
+        date: dateStr,
+        activities: existingDay ? existingDay.activities : []
+      })
+      
+      currentDate = addDays(currentDate, 1)
+    }
+    
+    return newDays
+  }
+
   const createTrip = () => {
     if (!tripName) {
       alert('Please enter a trip name')
@@ -70,7 +98,7 @@ export default function TripPlanner() {
       startDate: startDate || '',
       endDate: endDate || '',
       destinations: travelDestinations.filter(d => selectedDestinations.includes(d.id)),
-      itinerary: startDate && endDate ? generateTripDays(startDate, endDate) : (currentTrip?.itinerary || []),
+      itinerary: isEditMode && currentTrip ? mergeItineraryWithDates(currentTrip.itinerary, startDate || '', endDate || '') : (startDate && endDate ? generateTripDays(startDate, endDate) : []),
       createdAt: isEditMode && currentTrip ? currentTrip.createdAt : new Date().toISOString()
     }
 
